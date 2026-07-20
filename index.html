@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SandiFA — Validator Kata Sandi Berbasis DFA</title>
+<meta name="description" content="Implementasi Deterministic Finite Automaton (DFA) untuk validasi kata sandi berdasarkan aturan keamanan berbasis web.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0e2740;
+    --bg-2:#0a1e33;
+    --panel:#123a5c;
+    --panel-2:#0f314f;
+    --grid:rgba(255,255,255,0.045);
+    --line:#8fd6e6;
+    --line-dim:#3f6a80;
+    --amber:#f0a54a;
+    --green:#6fcf97;
+    --red:#e2685a;
+    --text:#eaf3f8;
+    --text-dim:#93aec4;
+    --mono:'IBM Plex Mono', monospace;
+    --sans:'IBM Plex Sans', sans-serif;
+    --disp:'Space Grotesk', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:
+      linear-gradient(var(--grid) 1px, transparent 1px) 0 0/40px 40px,
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0/40px 40px,
+      radial-gradient(circle at 15% 0%, #143e63 0%, var(--bg) 55%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--line);}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px;}
+
+  /* ---------- header ---------- */
+  header{padding:28px 0 0;}
+  .brand{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+  .brand .mark{font-family:var(--disp);font-weight:700;font-size:22px;letter-spacing:0.5px;}
+  .brand .mark span{color:var(--amber);}
+  .brand .sub{font-family:var(--mono);font-size:12px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;}
+
+  /* ---------- hero ---------- */
+  .hero{padding:40px 0 8px;}
+  h1{font-family:var(--disp);font-weight:700;font-size:clamp(28px,4.4vw,46px);line-height:1.12;margin:0 0 14px;max-width:820px;}
+  h1 em{font-style:normal;color:var(--line);}
+  .lede{color:var(--text-dim);max-width:640px;font-size:16px;margin:0 0 32px;}
+
+  .stage{
+    display:grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap:20px;
+    align-items:start;
+  }
+  @media (max-width:860px){ .stage{grid-template-columns:1fr;} }
+
+  .panel{
+    background:linear-gradient(180deg, var(--panel), var(--panel-2));
+    border:1px solid rgba(143,214,230,0.18);
+    border-radius:10px;
+    padding:22px;
+    position:relative;
+  }
+  .panel::before{
+    content:"";position:absolute;inset:0;border-radius:10px;pointer-events:none;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+  .panel-label{
+    font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;
+    color:var(--text-dim);margin:0 0 14px;display:flex;justify-content:space-between;align-items:center;
+  }
+  .panel-label .dot{width:7px;height:7px;border-radius:50%;background:var(--line-dim);display:inline-block;margin-right:6px;transition:background .2s;}
+  .panel-label .dot.on{background:var(--green);box-shadow:0 0 8px var(--green);}
+
+  input#pw{
+    width:100%;
+    background:var(--bg-2);
+    border:1px solid var(--line-dim);
+    border-radius:6px;
+    color:var(--text);
+    font-family:var(--mono);
+    font-size:18px;
+    letter-spacing:1px;
+    padding:14px 16px;
+    outline:none;
+  }
+  input#pw:focus{border-color:var(--line);box-shadow:0 0 0 3px rgba(143,214,230,0.15);}
+  .toggle-vis{
+    font-family:var(--mono);font-size:11px;color:var(--text-dim);cursor:pointer;
+    display:inline-flex;gap:6px;align-items:center;margin-top:10px;user-select:none;
+  }
+  .toggle-vis:hover{color:var(--line);}
+
+  .presets{display:flex;flex-wrap:wrap;gap:7px;}
+  .preset-btn{
+    font-family:var(--mono);font-size:11.5px;
+    background:var(--bg-2);border:1px solid var(--line-dim);color:var(--text-dim);
+    border-radius:5px;padding:6px 10px;cursor:pointer;transition:.15s;
+  }
+  .preset-btn:hover{border-color:var(--line);color:var(--line);}
+  .preset-btn .tag{font-size:9px;margin-right:6px;padding:1px 5px;border-radius:3px;letter-spacing:.5px;}
+  .preset-btn .tag.ok{background:rgba(111,207,151,0.18);color:var(--green);}
+  .preset-btn .tag.no{background:rgba(226,104,90,0.18);color:var(--red);}
+  .preset-btn .tag.trap{background:rgba(240,165,74,0.18);color:var(--amber);}
+
+  .verdict{
+    margin-top:16px;padding:14px 16px;border-radius:6px;
+    font-family:var(--mono);font-size:14px;
+    background:rgba(255,255,255,0.03);border:1px solid var(--line-dim);
+    display:flex;align-items:center;gap:10px;
+  }
+  .verdict.accept{border-color:var(--green);color:var(--green);}
+  .verdict.reject{border-color:var(--red);color:var(--red);}
+  .verdict.idle{color:var(--text-dim);}
+  .lamp{width:10px;height:10px;border-radius:50%;background:var(--text-dim);flex:none;}
+  .verdict.accept .lamp{background:var(--green);box-shadow:0 0 10px var(--green);}
+  .verdict.reject .lamp{background:var(--red);box-shadow:0 0 10px var(--red);}
+
+  /* state vector tape */
+  .tape-title{font-family:var(--mono);font-size:11px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;margin:22px 0 8px;}
+  .tape{
+    display:flex;gap:8px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;
+  }
+  .cell{
+    background:var(--bg-2);border:1px solid var(--line-dim);border-radius:5px;
+    padding:6px 9px;color:var(--text-dim);min-width:56px;text-align:center;transition:.15s;
+  }
+  .cell b{display:block;color:var(--text);font-size:14px;}
+  .cell.ok{border-color:var(--green);color:var(--green);}
+  .cell.ok b{color:var(--green);}
+  .cell.bad{border-color:var(--red);color:var(--red);}
+
+  .log{
+    margin-top:18px;background:var(--bg-2);border:1px solid var(--line-dim);border-radius:6px;
+    padding:10px 12px;height:120px;overflow-y:auto;font-family:var(--mono);font-size:11.5px;color:var(--text-dim);
+  }
+  .log div{padding:1px 0;white-space:pre;}
+  .log .acc{color:var(--green);}
+  .log .rej{color:var(--red);}
+
+  /* ---------- diagram (signature element) ---------- */
+  .diagram-wrap{overflow-x:auto;}
+  svg.dfa{width:100%;height:auto;display:block;min-width:520px;}
+  .mod-title{font-family:var(--mono);font-size:10px;fill:var(--text-dim);letter-spacing:.5px;}
+  .node{fill:var(--bg-2);stroke:var(--line-dim);stroke-width:1.6;transition:stroke .15s, fill .15s;}
+  .node.active{stroke:var(--amber);stroke-width:2.4;}
+  .node.accepting{stroke-dasharray:3 2;}
+  .node.sat{stroke:var(--green);fill:rgba(111,207,151,0.12);}
+  .wire{stroke:var(--line-dim);stroke-width:1.4;fill:none;transition:stroke .15s;}
+  .wire.live{stroke:var(--green);stroke-width:2;}
+  .nlabel{fill:var(--text);font-family:var(--mono);font-size:11px;text-anchor:middle;dominant-baseline:middle;}
+  .andgate{fill:var(--bg-2);stroke:var(--line);stroke-width:1.6;}
+  .andgate.hot{stroke:var(--green);fill:rgba(111,207,151,0.15);}
+
+  /* ---------- rules checklist ---------- */
+  .rules{list-style:none;margin:0;padding:0;display:grid;gap:8px;}
+  .rules li{
+    display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:13px;
+    padding:9px 10px;border-radius:6px;background:rgba(255,255,255,0.02);border:1px solid transparent;
+  }
+  .rules li.met{border-color:var(--green);color:var(--green);background:rgba(111,207,151,0.06);}
+  .rules li .chip{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--line-dim);flex:none;display:flex;align-items:center;justify-content:center;font-size:10px;}
+  .rules li.met .chip{border-color:var(--green);background:var(--green);color:#0e2740;}
+
+  /* ---------- explainer sections ---------- */
+  section.info{padding:56px 0;border-top:1px solid rgba(143,214,230,0.12);}
+  section.info h2{font-family:var(--disp);font-size:26px;margin:0 0 6px;}
+  section.info .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin:0 0 10px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:24px;}
+  @media (max-width:760px){.grid2{grid-template-columns:1fr;}}
+  .tuple{
+    font-family:var(--mono);font-size:14px;background:var(--bg-2);border:1px solid var(--line-dim);
+    border-radius:8px;padding:18px;line-height:1.9;color:var(--text-dim);
+  }
+  .tuple b{color:var(--line);}
+  table.spec{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px;margin-top:8px;}
+  table.spec th, table.spec td{border:1px solid var(--line-dim);padding:7px 10px;text-align:left;color:var(--text-dim);}
+  table.spec th{color:var(--text);font-weight:500;background:rgba(255,255,255,0.03);}
+
+  footer{padding:34px 0 50px;border-top:1px solid rgba(143,214,230,0.12);color:var(--text-dim);font-family:var(--mono);font-size:12px;}
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <div class="brand">
+    <div class="mark">Sandi<span>FA</span></div>
+    <div class="sub">Deterministic Finite Automaton · Password Policy Engine</div>
+  </div>
+</header>
+
+<main class="wrap hero">
+  <h1>Setiap karakter yang Anda ketik <em>menggerakkan sebuah automaton</em>.</h1>
+  <p class="lede">SandiFA memvalidasi kata sandi bukan dengan daftar aturan if/else, melainkan dengan lima automaton hingga (finite automata) yang berjalan paralel dan bergabung menjadi satu DFA produk. Ketik kata sandi di bawah untuk melihat state automaton berubah secara live.</p>
+
+  <div class="stage">
+    <!-- LEFT: input + diagram -->
+    <div class="panel">
+      <p class="panel-label"><span><span class="dot" id="dotRun"></span>SIMULATOR DFA</span><span id="charCount">0 karakter</span></p>
+      <input id="pw" type="password" autocomplete="off" spellcheck="false" placeholder="Ketik kata sandi di sini…">
+      <span class="toggle-vis" id="toggleVis">👁 tampilkan karakter</span>
+
+      <div class="verdict idle" id="verdict"><span class="lamp"></span><span id="verdictText">Menunggu input — DFA berada di state awal q₀.</span></div>
+
+      <p class="tape-title">Contoh Uji Coba (klik untuk isi otomatis)</p>
+      <div class="presets" id="presets"></div>
+
+      <p class="tape-title">Vektor state produk saat ini · q = (len, U, L, D, S)</p>
+      <div class="tape" id="tape">
+        <div class="cell" id="cellLen">len<b>0</b></div>
+        <div class="cell" id="cellU">U<b>0</b></div>
+        <div class="cell" id="cellL">L<b>0</b></div>
+        <div class="cell" id="cellD">D<b>0</b></div>
+        <div class="cell" id="cellS">S<b>0</b></div>
+      </div>
+
+      <p class="tape-title">Jejak transisi δ (log per karakter)</p>
+      <div class="log" id="log"><div style="color:var(--text-dim)">— belum ada transisi —</div></div>
+    </div>
+
+    <!-- RIGHT: checklist -->
+    <div class="panel">
+      <p class="panel-label"><span>SYARAT PENERIMAAN (F)</span><span id="metCount">0/5</span></p>
+      <ul class="rules" id="rules">
+        <li id="ruleLen"><span class="chip">·</span> Panjang ≥ 8 karakter — M₁ mencapai q₈</li>
+        <li id="ruleU"><span class="chip">·</span> ≥1 huruf besar (A–Z) — M₂ mencapai q₁</li>
+        <li id="ruleL"><span class="chip">·</span> ≥1 huruf kecil (a–z) — M₃ mencapai q₁</li>
+        <li id="ruleD"><span class="chip">·</span> ≥1 digit (0–9) — M₄ mencapai q₁</li>
+        <li id="ruleS"><span class="chip">·</span> ≥1 karakter khusus (!@#$%^&*_-+=) — M₅ mencapai q₁</li>
+      </ul>
+      <p class="tape-title">Status alfabet Σ</p>
+      <div class="verdict idle" id="alphabetStatus" style="margin-top:0;">
+        <span class="lamp"></span><span>Semua karakter valid (∈ Σ)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- DIAGRAM -->
+  <div class="panel" style="margin-top:20px;">
+    <p class="panel-label"><span>DIAGRAM AUTOMATON PRODUK M = M₁ × M₂ × M₃ × M₄ × M₅</span><span>skema, bukan skala sebenarnya</span></p>
+    <div class="diagram-wrap">
+      <svg class="dfa" id="dfaSvg" viewBox="0 0 1000 420" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+  </div>
+</main>
+
+<section class="info wrap">
+  <p class="eyebrow">Definisi Formal</p>
+  <h2>Automaton produk sebagai konstruksi teori bahasa formal</h2>
+  <div class="grid2">
+    <div class="tuple">
+      M = (Q, Σ, δ, q₀, F)<br><br>
+      <b>Q</b> = {0..8} × {0,1} × {0,1} × {0,1} × {0,1} × {trap}<br>
+      <b>Σ</b> = huruf besar ∪ huruf kecil ∪ digit ∪ simbol khusus<br>
+      <b>q₀</b> = (0, 0, 0, 0, 0)<br>
+      <b>F</b> = { (l,u,w,d,s) ∈ Q | l = 8 ∧ u=w=d=s = 1 }<br>
+      <b>δ</b> = transisi produk dari lima sub-automaton M₁…M₅, ditambah transisi ke state <b>trap</b> untuk setiap karakter ∉ Σ (menjamin non-recoverable reject / whitespace injection).
+    </div>
+    <div>
+      <table class="spec">
+        <tr><th>Sub-automaton</th><th>|Q|</th><th>Bahasa yang dikenali</th></tr>
+        <tr><td>M₁ (panjang)</td><td>9</td><td>{ w | |w| ≥ 8 }, dihitung dg saturating counter</td></tr>
+        <tr><td>M₂ (huruf besar)</td><td>2</td><td>Σ* A-Z Σ*</td></tr>
+        <tr><td>M₃ (huruf kecil)</td><td>2</td><td>Σ* a-z Σ*</td></tr>
+        <tr><td>M₄ (digit)</td><td>2</td><td>Σ* 0-9 Σ*</td></tr>
+        <tr><td>M₅ (simbol)</td><td>2</td><td>Σ* [simbol] Σ*</td></tr>
+      </table>
+      <p style="color:var(--text-dim);font-size:13px;margin-top:12px;">
+        Karena interseksi bahasa reguler bersifat tertutup (closed under intersection), gabungan lima automaton di atas — dibentuk melalui konstruksi produk (product construction) — tetap merupakan DFA tunggal dengan |Q| = 9×2×2×2×2 + 1(trap) = 145 state.
+      </p>
+    </div>
+  </div>
+</section>
+
+<footer class="wrap">
+  SandiFA — Studi Kasus UAS Teori Bahasa dan Otomata · Implementasi DFA untuk Validasi Password Berdasarkan Aturan Keamanan Berbasis Web.<br>
+  Seluruh proses validasi berjalan sepenuhnya pada sisi klien (browser) — tidak ada kata sandi yang dikirim atau disimpan ke server manapun.
+</footer>
+
+<script>
+(function(){
+  const pw = document.getElementById('pw');
+  const toggleVis = document.getElementById('toggleVis');
+  const verdict = document.getElementById('verdict');
+  const verdictText = document.getElementById('verdictText');
+  const dotRun = document.getElementById('dotRun');
+  const charCount = document.getElementById('charCount');
+  const metCount = document.getElementById('metCount');
+  const logEl = document.getElementById('log');
+  const alphabetStatus = document.getElementById('alphabetStatus');
+  const SPECIALS = "!@#$%^&*()_+-=[]{}";
+
+  const cells = { len:document.getElementById('cellLen'), U:document.getElementById('cellU'), L:document.getElementById('cellL'), D:document.getElementById('cellD'), S:document.getElementById('cellS') };
+  const rules = { len:document.getElementById('ruleLen'), U:document.getElementById('ruleU'), L:document.getElementById('ruleL'), D:document.getElementById('ruleD'), S:document.getElementById('ruleS') };
+
+  toggleVis.addEventListener('click', ()=>{
+    const showing = pw.type === 'text';
+    pw.type = showing ? 'password' : 'text';
+    toggleVis.textContent = showing ? '👁 tampilkan karakter' : '🙈 sembunyikan karakter';
+  });
+
+  function classify(ch){
+    if (/[A-Z]/.test(ch)) return 'U';
+    if (/[a-z]/.test(ch)) return 'L';
+    if (/[0-9]/.test(ch)) return 'D';
+    if (SPECIALS.indexOf(ch) !== -1) return 'S';
+    return null; // not in Sigma -> trap
+  }
+
+  function run(str){
+    let state = {len:0, U:0, L:0, D:0, S:0};
+    let trapped = false;
+    let trapChar = null;
+    const trace = [];
+    for (const ch of str){
+      if (trapped) { trace.push({ch, note:'trap (menyerap)'}); continue; }
+      const cls = classify(ch);
+      if (cls === null){
+        trapped = true; trapChar = ch;
+        trace.push({ch, note:'∉ Σ → menuju state TRAP'});
+        continue;
+      }
+      state = {...state, [cls]: 1, len: Math.min(state.len+1, 8)};
+      trace.push({ch, note:`δ(q,${cls==='U'?'A-Z':cls==='L'?'a-z':cls==='D'?'0-9':'sym'}) → q'`, state:{...state}});
+    }
+    const accept = !trapped && state.len===8 && state.U && state.L && state.D && state.S;
+    return {state, trapped, trapChar, trace, accept};
+  }
+
+  function render(){
+    const val = pw.value;
+    charCount.textContent = val.length + ' karakter';
+    const res = run(val);
+    dotRun.classList.toggle('on', val.length>0);
+
+    // cells
+    cells.len.innerHTML = 'len<b>'+res.state.len+'/8</b>';
+    cells.U.innerHTML = 'U<b>'+res.state.U+'</b>';
+    cells.L.innerHTML = 'L<b>'+res.state.L+'</b>';
+    cells.D.innerHTML = 'D<b>'+res.state.D+'</b>';
+    cells.S.innerHTML = 'S<b>'+res.state.S+'</b>';
+    ['len','U','L','D','S'].forEach(k=>{
+      const c = cells[k];
+      c.classList.remove('ok','bad');
+      if (res.trapped) c.classList.add('bad');
+      else if ((k==='len' && res.state.len===8) || (k!=='len' && res.state[k]===1)) c.classList.add('ok');
+    });
+
+    // rules
+    const metFlags = {len:res.state.len===8, U:!!res.state.U, L:!!res.state.L, D:!!res.state.D, S:!!res.state.S};
+    let met = 0;
+    Object.keys(rules).forEach(k=>{
+      const ok = !res.trapped && metFlags[k];
+      rules[k].classList.toggle('met', ok);
+      rules[k].querySelector('.chip').textContent = ok ? '✓' : '·';
+      if (ok) met++;
+    });
+    metCount.textContent = met + '/5';
+
+    // alphabet status
+    if (res.trapped){
+      alphabetStatus.className = 'verdict reject';
+      alphabetStatus.querySelector('span:last-child').textContent = 'Karakter tidak valid terdeteksi ("'+res.trapChar+'") → state TRAP, δ tidak dapat kembali';
+    } else {
+      alphabetStatus.className = 'verdict idle';
+      alphabetStatus.querySelector('span:last-child').textContent = 'Semua karakter valid (∈ Σ)';
+    }
+
+    // verdict
+    if (val.length===0){
+      verdict.className = 'verdict idle';
+      verdictText.textContent = 'Menunggu input — DFA berada di state awal q₀.';
+    } else if (res.accept){
+      verdict.className = 'verdict accept';
+      verdictText.textContent = 'DITERIMA — state saat ini ∈ F. Kata sandi memenuhi seluruh kebijakan keamanan.';
+    } else {
+      verdict.className = 'verdict reject';
+      const missing = Object.keys(metFlags).filter(k=>!metFlags[k]);
+      verdictText.textContent = res.trapped
+        ? 'DITOLAK — karakter di luar Σ membawa automaton ke state trap.'
+        : 'DITOLAK — state saat ini ∉ F. Syarat belum terpenuhi: ' + missing.join(', ') + '.';
+    }
+
+    // log
+    logEl.innerHTML = '';
+    if (res.trace.length===0){
+      logEl.innerHTML = '<div style="color:var(--text-dim)">— belum ada transisi —</div>';
+    } else {
+      res.trace.slice(-60).forEach((t,i)=>{
+        const div = document.createElement('div');
+        const shown = t.ch === ' ' ? '⎵' : t.ch;
+        div.textContent = `#${i+1}  input='${shown}'  ${t.note}`;
+        if (t.note.includes('TRAP')) div.classList.add('rej');
+        logEl.appendChild(div);
+      });
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    drawDiagram(metFlags, res.trapped, res.accept);
+  }
+
+  // ---------- SVG diagram ----------
+  const svg = document.getElementById('dfaSvg');
+
+  function miniAutomaton(cx, cy, label, satisfied, twoState){
+    // returns svg string for a small automaton module: q0 -> q1 (self loops omitted for clarity)
+    const r = 20;
+    const activeQ0 = !satisfied;
+    const activeQ1 = satisfied;
+    return `
+      <g>
+        <text x="${cx}" y="${cy-38}" class="mod-title" text-anchor="middle">${label}</text>
+        <circle cx="${cx-30}" cy="${cy}" r="${r}" class="node ${activeQ0?'active':''}"></circle>
+        <text x="${cx-30}" y="${cy}" class="nlabel">q0</text>
+        <circle cx="${cx+30}" cy="${cy}" r="${r}" class="node ${satisfied?'sat active':''} accepting"></circle>
+        <text x="${cx+30}" y="${cy}" class="nlabel">q1</text>
+        <path d="M ${cx-10},${cy} L ${cx+8},${cy}" class="wire ${satisfied?'live':''}" marker-end="url(#arrow)"></path>
+      </g>`;
+  }
+
+  function drawDiagram(flags, trapped, accept){
+    const modules = [
+      {key:'len', label:'M1 · panjang≥8', cx:140, cy:100},
+      {key:'U', label:'M2 · huruf besar', cx:400, cy:100},
+      {key:'L', label:'M3 · huruf kecil', cx:660, cy:100},
+      {key:'D', label:'M4 · digit', cx:400, cy:260},
+      {key:'S', label:'M5 · simbol', cx:660, cy:260},
+    ];
+    let inner = `<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="var(--line)"></path></marker></defs>`;
+    modules.forEach(m=> inner += miniAutomaton(m.cx, m.cy, m.label, flags[m.key]));
+
+    // wires to AND gate
+    const gate = {cx:880, cy:180};
+    modules.forEach(m=>{
+      const live = flags[m.key] && !trapped;
+      inner += `<path d="M ${m.cx+50},${m.cy} C ${m.cx+120},${m.cy} ${gate.cx-80},${gate.cy} ${gate.cx-34},${gate.cy}" class="wire ${live?'live':''}"></path>`;
+    });
+    inner += `<circle cx="${gate.cx}" cy="${gate.cy}" r="34" class="andgate ${accept?'hot':''}"></circle>`;
+    inner += `<text x="${gate.cx}" y="${gate.cy-4}" class="nlabel" style="font-size:10px;">AND</text>`;
+    inner += `<text x="${gate.cx}" y="${gate.cy+12}" class="nlabel" style="font-size:10px;">F</text>`;
+    inner += `<text x="${gate.cx}" y="${gate.cy+55}" class="mod-title" text-anchor="middle">${trapped? 'TRAP (Σ dilanggar)' : (accept? 'ACCEPT' : 'belum ACCEPT')}</text>`;
+
+    svg.innerHTML = inner;
+  }
+
+  // ---------- preset test cases ----------
+  const PRESETS = [
+    {label:'password', tag:'no', pw:'password'},
+    {label:'PASSWORD', tag:'no', pw:'PASSWORD'},
+    {label:'Password1', tag:'no', pw:'Password1'},
+    {label:'Pw1!', tag:'no', pw:'Pw1!'},
+    {label:'Password1!', tag:'ok', pw:'Password1!'},
+    {label:'S4ndiFA!Aman', tag:'ok', pw:'S4ndiFA!Aman'},
+    {label:'Pass word1!', tag:'trap', pw:'Pass word1!'},
+  ];
+  const presetsEl = document.getElementById('presets');
+  const TAG_TEXT = {ok:'DITERIMA', no:'DITOLAK', trap:'TRAP'};
+  PRESETS.forEach(item=>{
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'preset-btn';
+    btn.innerHTML = `<span class="tag ${item.tag}">${TAG_TEXT[item.tag]}</span>${item.label}`;
+    btn.addEventListener('click', ()=>{
+      pw.value = item.pw;
+      pw.type = 'text';
+      toggleVis.textContent = '🙈 sembunyikan karakter';
+      pw.focus();
+      render();
+    });
+    presetsEl.appendChild(btn);
+  });
+
+  pw.addEventListener('input', render);
+  render();
+})();
+</script>
+</body>
+</html>
